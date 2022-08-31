@@ -23,28 +23,24 @@ function mandelbrot(x::Float64, y::Float64)::Int
 end
 
 function length_to_colour(length::Int)::Tuple{UInt8, UInt8, UInt8}
-    # Black -> blue -> green -> yellow -> red
-    prog = length / MANDELBROT_MAX_ITERATIONS
-    colour_prog = length / MANDELBROT_MAX_ITERATIONS * 4
+    # Black -> blue -> green -> yellow -> red -> white.
+    colour_val = Int(round((length % COLOUR_BAND_WIDTH) / COLOUR_BAND_WIDTH * 255))
 
-    while colour_prog >= 1
-        colour_prog -= 1
-    end
-
-    if prog < 0.25
-        colour_prog = prog * 4
-        return (0, 0, Int(round(255 * colour_prog)))
-    elseif prog < 0.5
-        colour_prog = (prog - 0.25) * 4
-        return (0, Int(round(255 * colour_prog)), Int(round(255 * (1 - colour_prog))))
-    elseif prog < 0.75
-        colour_prog = (prog - 0.5) * 4
-        return (Int(round(255 * colour_prog)), 255, 0)
+    if length < COLOUR_BAND_WIDTH
+        return (0, 0, colour_val)
+    elseif length < 2COLOUR_BAND_WIDTH
+        return (0, colour_val, 255 - colour_val)
+    elseif length < 3COLOUR_BAND_WIDTH
+        return (colour_val, 255, 0)
+    elseif length < 4COLOUR_BAND_WIDTH
+        return (255, 255 - colour_val, 0)
+    elseif length < 5COLOUR_BAND_WIDTH
+        return (255, colour_val, colour_val)
+    elseif length < 6COLOUR_BAND_WIDTH
+        return (colour_val, colour_val, colour_val)
     else
-        colour_prog = (prog - 0.75) * 4
-        return (255, Int(round(255 * (1 - colour_prog))), 0)
+        return (255, 255, 255)
     end
-end
 
 function pixel_to_complex(x::Int, y::Int)::Tuple{Float64, Float64}
     cx = x / PICTURE_UNIT - 2.3  # Increase this number to shift right.
@@ -104,6 +100,8 @@ function generate()
         for y = 1:PICTURE_HEIGHT
             cx, cy = pixel_to_complex(x, y)
             mandel = mandelbrot(cx, cy)
+            
+            # Draw the colour accordingly, unless the point is in the mandelbrot set, then just leave that pixel.
             if mandel != -1
                 mandel_colour = length_to_colour(mandel)
                 draw_point!(img, x, y, mandel_colour)
