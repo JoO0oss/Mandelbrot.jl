@@ -1,14 +1,30 @@
+if !("-s=ALL" in ARGS || "--silence=ALL" in ARGS || "-h" in ARGS || "--help" in ARGS)
+    println("Running mandelbrot.jl.")
+end
+
 import Images
 
-PICTURE_UNIT = 500  # How many pixels per unit in the complex plane.
-MANDELBROT_MAX_ITERATIONS = 100
+#### Numerical parameters, tweak as desired. ####
 
-PICTURE_WIDTH = Int(round(PICTURE_UNIT * 3.2))
-PICTURE_HEIGHT = Int(round(PICTURE_UNIT * 2.5))
+PICTURE_UNIT = 2000  # How many pixels per unit in the complex plane.
+MANDELBROT_MAX_ITERATIONS = 200
+COLOUR_BAND_WIDTH = 20  # How many iterations to go to the next colour.
+
+UNIT_WIDTH = 3.2  # The range of real units wide the picture is.
+UNIT_HEIGHT = 2.5  # The range of complex units high the picture is.
+
+X_UNIT_OFFSET = 0.5  # Increase this number to move the image right.
+Y_UNIT_OFFSET = 0  # Increase this number to move the image up.
+
+#### End of numerical parameters. ####
+
 
 REPORT_PROGRESS = true  # Percentage progress report.
 SILENCE_OUTPUT = false  # Hide away start and finish messages.
 OVERWRITE_EXISTING = false  # Automatically overwrite a picture without asking the user.
+
+PICTURE_WIDTH = Int(round(PICTURE_UNIT * UNIT_WIDTH))
+PICTURE_HEIGHT = Int(round(PICTURE_UNIT * UNIT_HEIGHT))
 
 function mandelbrot(x::Float64, y::Float64)::Int
     c = x + y*im
@@ -36,15 +52,14 @@ function length_to_colour(length::Int)::Tuple{UInt8, UInt8, UInt8}
         return (255, 255 - colour_val, 0)
     elseif length < 5COLOUR_BAND_WIDTH
         return (255, colour_val, colour_val)
-    elseif length < 6COLOUR_BAND_WIDTH
-        return (colour_val, colour_val, colour_val)
     else
         return (255, 255, 255)
     end
+end
 
 function pixel_to_complex(x::Int, y::Int)::Tuple{Float64, Float64}
-    cx = x / PICTURE_UNIT - 2.3  # Increase this number to shift right.
-    cy = - (y / PICTURE_UNIT) + 1.25  # Increase this number to shift down.
+    cx = x / PICTURE_UNIT - UNIT_WIDTH/2 - X_UNIT_OFFSET
+    cy = -(y / PICTURE_UNIT) + UNIT_HEIGHT/2 - Y_UNIT_OFFSET
 
     return cx, cy
 end
@@ -67,9 +82,14 @@ function generate()
         overwrite = isfile(filename)
     else
         if isfile(filename)
-            print("Picture already exists. Overwrite? [Y/n] ")
-            user_in = lowercase(readline())
-            overwrite = commit_write = (user_in == "y" || user_in == "yes" || user_in == "")
+            if !SILENCE_OUTPUT
+                print("Picture already exists. Overwrite? [Y/n] ")
+                user_in = lowercase(readline())
+                overwrite = commit_write = (user_in == "y" || user_in == "yes" || user_in == "")
+            else
+                # If the user does not want output, then, if a file already exists, just stop.
+                commit_write = false
+            end
         else
             commit_write = true
             overwrite = false
@@ -91,6 +111,11 @@ function generate()
     end
 
     img::Array{UInt8, 3} = fill(0, (PICTURE_HEIGHT, PICTURE_WIDTH, 3))
+
+
+    if !SILENCE_OUTPUT
+        println("Image processing started.")
+    end
 
     total_pixels = PICTURE_WIDTH * PICTURE_HEIGHT
     pc_through = 0
@@ -117,7 +142,15 @@ function generate()
         println("100%")
     end
     
+    if !SILENCE_OUTPUT
+        println("Image processing finished.")
+    end
+
     Images.save(filename, img)
+
+    if !SILENCE_OUTPUT
+        println("Image saved.")
+    end
 end
 
 function main()
@@ -131,7 +164,7 @@ function main()
         println()
         println("Options:")
         println("  -h, --help       Print this help message.")
-        println("  -s, --silence    Silence output. If --silence=ALL, then the percentage progress report is turned off, too.")
+        println("  -s, --silence    Hide percentage progress report. If --silence=ALL, then silence all output.")
         println("  -y, --overwrite  Overwrite existing image without asking.")
         return
     end
@@ -140,34 +173,36 @@ function main()
         if contains(arg, "=")
             arg_name, arg_val = split(arg, "=", limit=2)
             
-            if (arg_name == "--silence" || arg_name == "-s") && arg_val == "ALL"
-                REPORT_PROGRESS = false
-                SILENCE_OUTPUT = true
+            if (arg_name == "--silence" || arg_name == "-s")
+                if arg_val == "ALL"
+                    REPORT_PROGRESS = false
+                    SILENCE_OUTPUT = true
+                else
+                    println("Unrecognised value: '$arg_val' for argument '$arg_name', use --help or -h for more information.")
+                    return
+                end
+            else
+                println("Unrecognised argument: '$arg_name=...' to be used with a value, use --help or -h for more information.")
+                return
             end
         else
             arg_name = arg
         
             if arg_name == "--silence" || arg_name == "-s"
-                # If just the silence option is provided, then give start and end outputs.
+                # If just the silence option is provided, then give start and end outputs.s
                 REPORT_PROGRESS = false
-            end
-
-            if (arg_name == "--overwrite" || arg_name == "-y")
+            elseif (arg_name == "--overwrite" || arg_name == "-y")
                 # -y or "--overwrite" option means ignore existing image in that place.
                 OVERWRITE_EXISTING = true
+            else
+                println("Unrecognised argument: '$arg_name', use --help or -h for more information.")
+                return
             end
         end
     end
 
-    if !SILENCE_OUTPUT
-        println("Image processing started.")
-    end
     
     generate()
-
-    if !SILENCE_OUTPUT
-        println("Image processing finished.")
-    end
 end
 
 
